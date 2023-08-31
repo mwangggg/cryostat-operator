@@ -75,7 +75,40 @@ jobs:
             pull_number: context.issue.number
           })
           return { repo: result.data.head.repo.full_name, num: result.data.number, ref: result.data.head.ref }
-    
+  
+  get-test-image-tag:
+    runs-on: ubuntu-latest
+    needs: [checkout-branch]
+    env:
+      num: ${{ needs.checkout-branch.outputs.PR_num }}
+    outputs:
+      tag: ${{ steps.compute-tag.outputs.tag }}
+    steps:
+    - name: Compute test image tag
+      id: compute-tag
+      run: |
+        prefix="ci"
+        if [ -n "${{ env.num }}" ]; then
+          prefix="pr-${{ env.num }}"
+        fi
+        echo "tag=${prefix}-$GITHUB_SHA" >> $GITHUB_OUTPUT
+
+  clean-up-test-images:
+    runs-on: ubuntu-latest
+    needs: [get-test-image-tag, scorecard-test]
+    strategy:
+      matrix:
+        image: [cryostat-operator, cryostat-operator-bundle, cryostat-operator-scorecard]
+    steps:
+    - uses: r26d/ghcr-delete-image-action@v1.3.0
+      with:
+        owner: ${{ github.repository_owner }}
+        name: ${{ matrix.image }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+        ignore-missing-package: true
+        tag-regex: ${{ needs.get-test-image-tag.outputs.tag }}
+        tagged-keep-latest: 0
+
   controller-test:
     runs-on: ubuntu-latest
     needs: [checkout-branch]
@@ -105,11 +138,11 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       packages: write
-    needs: [checkout-branch]
+    needs: [checkout-branch, get-test-image-tag]
     env:
       ref: ${{ needs.checkout-branch.outputs.PR_head_ref }}
       repo: ${{ needs.checkout-branch.outputs.PR_repo }}
-      num: ${{ needs.checkout-branch.outputs.PR_num }}
+      TAG: ${{ needs.get-test-image-tag.outputs.tag }}
     steps:
     - uses: actions/checkout@v2
       with:
@@ -124,17 +157,9 @@ jobs:
         curl -fsSL $OPENSUSE_UNOFFICIAL_LIBCONTAINERS_KEY_URL | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/devel_kubic_libcontainers_unstable.gpg
         sudo apt update
         sudo apt install podman
-    - name: Compute test image tags
-      id: compute-tag
-      run: |
-        prefix="ci"
-        if [ -n "${{ env.num }}" ]; then
-          prefix="pr-${{ env.num }}"
-        fi
-        echo "tag=${prefix}-$GITHUB_SHA" >> $GITHUB_OUTPUT
     - name: Build scorecard image for test
       run: |
-        CUSTOM_SCORECARD_IMG=ghcr.io/${{ github.repository_owner }}/cryostat-operator-scorecard:${{ steps.compute-tag.outputs.tag }} \
+        CUSTOM_SCORECARD_IMG=ghcr.io/${{ github.repository_owner }}/cryostat-operator-scorecard:${{ env.TAG }} \
         PLATFORMS=linux/amd64 \
         MANIFEST_PUSH=false \
         make scorecard-build
@@ -143,13 +168,13 @@ jobs:
       uses: redhat-actions/push-to-registry@v2
       with:
         image: cryostat-operator-scorecard
-        tags: ${{ steps.compute-tag.outputs.tag }}
+        tags: ${{ env.TAG }}
         registry: ghcr.io/${{ github.repository_owner }}
         username: ${{ github.repository_owner }}
         password: ${{ secrets.GITHUB_TOKEN }}
     - name: Build operator image for test
       run: |
-        OPERATOR_IMG=ghcr.io/${{ github.repository_owner }}/cryostat-operator:${{ steps.compute-tag.outputs.tag }} \
+        OPERATOR_IMG=ghcr.io/${{ github.repository_owner }}/cryostat-operator:${{ env.TAG }} \
         SKIP_TESTS=true \
         make oci-build
     - name: Push operator image to ghcr.io for test
@@ -157,7 +182,7 @@ jobs:
       uses: redhat-actions/push-to-registry@v2
       with:
         image: cryostat-operator
-        tags: ${{ steps.compute-tag.outputs.tag }}
+        tags: ${{ env.TAG }}
         registry: ghcr.io/${{ github.repository_owner }}
         username: ${{ github.repository_owner }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -165,14 +190,14 @@ jobs:
       run: |
         yq -i '.spec.template.spec.imagePullSecrets = [{"name": "registry-key"}]' config/manager/manager.yaml
         OPERATOR_IMG=${{ steps.push-operator-to-ghcr.outputs.registry-path }} \
-        BUNDLE_IMG=ghcr.io/${{ github.repository_owner }}/cryostat-operator-bundle:${{ steps.compute-tag.outputs.tag }} \
+        BUNDLE_IMG=ghcr.io/${{ github.repository_owner }}/cryostat-operator-bundle:${{ env.TAG }} \
         make bundle bundle-build
     - name: Push bundle image to ghcr.io for test
       id: push-bundle-to-ghcr
       uses: redhat-actions/push-to-registry@v2
       with:
         image: cryostat-operator-bundle
-        tags: ${{ steps.compute-tag.outputs.tag }}
+        tags: ${{ env.TAG }}
         registry: ghcr.io/${{ github.repository_owner }}
         username: ${{ github.repository_owner }}
         password: ${{ secrets.GITHUB_TOKEN }}
