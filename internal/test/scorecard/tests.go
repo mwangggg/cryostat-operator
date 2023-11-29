@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -116,6 +117,13 @@ func CryostatCRTest(bundle *apimanifests.Bundle, namespace string, openShiftCert
 		return fail(r, fmt.Sprintf("Cryostat main deployment did not become available: %s", err.Error()))
 	}
 
+	// Switch Cryostat CR to PVC
+	cr.Spec.StorageOptions = &operatorv1beta1.StorageConfiguration{
+		PVC: &operatorv1beta1.PersistentVolumeClaimConfig{
+			Spec: newPVCSpec("", "1Gi"),
+		},
+	}
+
 	// Poll the deployment until it becomes available or we timeout
 	err = wait.PollImmediateUntilWithContext(ctx, time.Second, func(ctx context.Context) (done bool, err error) {
 		cr, err = client.OperatorCRDs().Cryostats(namespace).Get(ctx, cr.Name)
@@ -190,6 +198,19 @@ func cleanupCryostat(r *scapiv1alpha3.TestResult, client *CryostatClientset, nam
 		cr.Name, &metav1.DeleteOptions{})
 	if err != nil {
 		r.Log += fmt.Sprintf("failed to delete Cryostat: %s\n", err.Error())
+	}
+}
+
+func newPVCSpec(storageClass string, storageRequest string,
+	accessModes ...corev1.PersistentVolumeAccessMode) *corev1.PersistentVolumeClaimSpec {
+	return &corev1.PersistentVolumeClaimSpec{
+		StorageClassName: &storageClass,
+		AccessModes:      accessModes,
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceStorage: resource.MustParse(storageRequest),
+			},
+		},
 	}
 }
 
