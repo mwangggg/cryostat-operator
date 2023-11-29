@@ -94,8 +94,13 @@ func CryostatCRTest(bundle *apimanifests.Bundle, namespace string, openShiftCert
 		}
 	}
 
-	// Create a default Cryostat CR
+	// Create a default Cryostat CR with default empty dir
 	cr := newCryostatCR(namespace, !openshift)
+	cr.Spec.StorageOptions = &operatorv1beta1.StorageConfiguration{
+		EmptyDir: &operatorv1beta1.EmptyDirConfig{
+			Enabled: true,
+		},
+	}
 
 	ctx := context.Background()
 	cr, err = client.OperatorCRDs().Cryostats(namespace).Create(ctx, cr)
@@ -103,7 +108,7 @@ func CryostatCRTest(bundle *apimanifests.Bundle, namespace string, openShiftCert
 		return fail(r, fmt.Sprintf("failed to create Cryostat CR: %s", err.Error()))
 	}
 
-	// Poll the deployment until it becomes available or we timeout
+	// Wait for deployment to become available
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 	err = waitForDeploymentAvailability(ctx, client, cr.Namespace, cr.Name, &r)
@@ -111,6 +116,7 @@ func CryostatCRTest(bundle *apimanifests.Bundle, namespace string, openShiftCert
 		return fail(r, fmt.Sprintf("Cryostat main deployment did not become available: %s", err.Error()))
 	}
 
+	// Poll the deployment until it becomes available or we timeout
 	err = wait.PollImmediateUntilWithContext(ctx, time.Second, func(ctx context.Context) (done bool, err error) {
 		cr, err = client.OperatorCRDs().Cryostats(namespace).Get(ctx, cr.Name)
 		if err != nil {
