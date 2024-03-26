@@ -146,7 +146,7 @@ func CryostatConfigChangeTest(bundle *apimanifests.Bundle, namespace string, ope
 func CryostatRecordingTest(bundle *apimanifests.Bundle, namespace string, openShiftCertManager bool) (result scapiv1alpha3.TestResult) {
 	tr := newTestResources(CryostatRecordingTestName)
 	r := tr.TestResult
-	ch := make(chan *ContainerLog)
+	var ch chan *ContainerLog
 
 	err := setupCRTestResources(tr, openShiftCertManager)
 	if err != nil {

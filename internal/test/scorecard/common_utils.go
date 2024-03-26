@@ -500,7 +500,7 @@ func updateAndWaitTillCryostatAvailable(cr *operatorv1beta1.Cryostat, resources 
 	return err
 }
 
-func cleanupAndLogs(r *scapiv1alpha3.TestResult, client *CryostatClientset, name string, namespace string, ch *chan *ContainerLog) {
+func cleanupAndLogs(r *scapiv1alpha3.TestResult, client *CryostatClientset, name string, namespace string, logChannel *chan *ContainerLog) {
 	LogWorkloadEventsOnError(r, client, namespace, name)
 
 	cr := &operatorv1beta1.Cryostat{
@@ -517,8 +517,8 @@ func cleanupAndLogs(r *scapiv1alpha3.TestResult, client *CryostatClientset, name
 		}
 	}
 
-	if ch != nil {
-		CollectContainersLogsToResult(r, *ch)
+	if logChannel != nil {
+		CollectContainersLogsToResult(r, *logChannel)
 	}
 }
 
