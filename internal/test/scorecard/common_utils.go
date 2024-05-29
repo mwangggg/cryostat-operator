@@ -365,7 +365,7 @@ func (r *TestResources) newSampleApp() *appsv1.Deployment {
 								},
 								{
 									Name:  "CRYOSTAT_AGENT_BASEURI",
-									Value: fmt.Sprintf("https://cryostat-agent.%s.svc:8181", r.Namespace),
+									Value: fmt.Sprintf("https://cryostat-agent.%s.svc:4180", r.Namespace),
 								},
 								{
 									Name:  "CRYOSTAT_AGENT_CALLBACK",
@@ -809,7 +809,7 @@ func (r *TestResources) getSampleAppTarget(apiClient *CryostatRESTClientset) (*T
 
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
-	err := wait.PollImmediateUntilWithContext(ctx, time.Second, func(ctx context.Context) (done bool, err error) {
+	err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (done bool, err error) {
 		targets, err := apiClient.Targets().List(ctx)
 		if err != nil {
 			return false, fmt.Errorf("failed to list targets: %s", err.Error())

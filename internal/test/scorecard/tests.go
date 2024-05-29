@@ -18,12 +18,10 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	"time"
 
 	operatorv1beta2 "github.com/cryostatio/cryostat-operator/api/v1beta2"
 	scapiv1alpha3 "github.com/operator-framework/api/pkg/apis/scorecard/v1alpha3"
 	apimanifests "github.com/operator-framework/api/pkg/manifests"
-	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
@@ -160,6 +158,10 @@ func CryostatRecordingTest(bundle *apimanifests.Bundle, namespace string, openSh
 	if err != nil {
 		return r.fail(fmt.Sprintf("failed to determine application URL: %s", err.Error()))
 	}
+	err = r.StartLogs(cr)
+	if err != nil {
+		r.Log += fmt.Sprintf("failed to retrieve logs for the application: %s", err.Error())
+	}
 
 	base, err := url.Parse(cr.Status.ApplicationURL)
 	if err != nil {
@@ -192,7 +194,7 @@ func CryostatRecordingTest(bundle *apimanifests.Bundle, namespace string, openSh
 	return r.TestResult
 }
 
-// TODO add a built in discovery test too
+/** built in discovery test
 func CryostatBuiltInTest(bundle *apimanifests.Bundle, namespace string, openShiftCertManager bool) *scapiv1alpha3.TestResult {
 	r := newTestResources(CryostatBuiltInTestName, namespace)
 
@@ -251,7 +253,7 @@ func CryostatBuiltInTest(bundle *apimanifests.Bundle, namespace string, openShif
 	}
 
 	return r.TestResult
-}
+}**/
 
 // CryostatReportTest checks that the operator deploys a report sidecar in response to a Cryostat CR
 func CryostatReportTest(bundle *apimanifests.Bundle, namespace string, openShiftCertManager bool) *scapiv1alpha3.TestResult {
@@ -286,6 +288,11 @@ func CryostatReportTest(bundle *apimanifests.Bundle, namespace string, openShift
 		return r.fail(fmt.Sprintf("failed to reach the application: %s", err.Error()))
 	}
 
+	err = r.StartLogs(cr)
+	if err != nil {
+		r.Log += fmt.Sprintf("failed to retrieve logs for the application: %s", err.Error())
+	}
+
 	return r.TestResult
 }
 
@@ -302,6 +309,10 @@ func CryostatAgentTest(bundle *apimanifests.Bundle, namespace string, openShiftC
 	cr, err := r.createAndWaitTillCryostatAvailable(r.newCryostatCR())
 	if err != nil {
 		return r.fail(fmt.Sprintf("failed to determine application URL: %s", err.Error()))
+	}
+	err = r.StartLogs(cr)
+	if err != nil {
+		r.Log += fmt.Sprintf("failed to retrieve logs for the application: %s", err.Error())
 	}
 
 	base, err := url.Parse(cr.Status.ApplicationURL)
