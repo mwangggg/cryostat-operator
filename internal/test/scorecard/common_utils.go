@@ -361,19 +361,39 @@ func (r *TestResources) newSampleApp() *appsv1.Deployment {
 							Env: []corev1.EnvVar{
 								{
 									Name:  "CRYOSTAT_AGENT_APP_NAME",
-									Value: "agent-test",
+									Value: "quarkus-test-agent",
 								},
 								{
 									Name:  "CRYOSTAT_AGENT_BASEURI",
-									Value: fmt.Sprintf("https://cryostat-agent.%s.svc:4180", r.Namespace),
+									Value: fmt.Sprintf("https://%s.%s.svc:4180", r.Name, r.Namespace),
+								},
+								{
+									Name: "POD_IP",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
+											FieldPath: "status.podIP",
+										},
+									},
+								},
+								{
+									Name:  "CRYOSTAT_AGENT_API_WRITES_ENABLED",
+									Value: "true",
 								},
 								{
 									Name:  "CRYOSTAT_AGENT_CALLBACK",
-									Value: "http://quarkus-test-agent:9977",
+									Value: "http://${POD_IP}:9977",
 								},
 								{
 									Name:  "CRYOSTAT_AGENT_AUTHORIZATION",
 									Value: "Bearer abcd1234",
+								},
+								{
+									Name:  "CRYOSTAT_AGENT_WEBCLIENT_SSL_TRUST_ALL",
+									Value: "true",
+								},
+								{
+									Name:  "CRYOSTAT_AGENT_WEBCLIENT_SSL_VERIFY_HOSTNAME",
+									Value: "false",
 								},
 								{
 									Name: "KEYSTORE_PASS",
@@ -770,6 +790,24 @@ func (r *TestResources) getReportPodNameForCR(cr *operatorv1beta2.Cryostat) (str
 	return names[0].ObjectMeta.Name, nil
 }
 
+func (r *TestResources) getSampleAppPodName() (string, error) {
+	selector := metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			"app": "quarkus-test-agent",
+		},
+	}
+
+	names, err := r.getPodnamesForSelector(r.Namespace, selector)
+	if err != nil {
+		return "", err
+	}
+
+	if len(names) == 0 {
+		return "", fmt.Errorf("no matching sample app pods")
+	}
+	return names[0].ObjectMeta.Name, nil
+}
+
 func (r *TestResources) getPodnamesForSelector(namespace string, selector metav1.LabelSelector) ([]corev1.Pod, error) {
 	labelSelector := labels.Set(selector.MatchLabels).String()
 
@@ -798,6 +836,26 @@ func (r *TestResources) applyAndCreateSampleApplication(deploy *appsv1.Deploymen
 	err = r.waitForDeploymentAvailability(ctx, r.Name, r.Namespace)
 	if err != nil {
 		r.logError(fmt.Sprintf("sample app deployment did not become available: %s", err.Error()))
+		return nil, err
+	}
+
+	err = wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (done bool, err error) {
+		sampleAppPodName, err := r.getSampleAppPodName()
+		if err != nil {
+			return false, nil
+		}
+		pod, err := r.Client.CoreV1().Pods(r.Namespace).Get(ctx, sampleAppPodName, metav1.GetOptions{})
+		if err != nil {
+			return false, fmt.Errorf("failed to get sample app pod: %s", err.Error())
+		}
+		if pod.Status.Phase != "Running" {
+			r.Log += "sample app pod is still being created\n"
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		r.logError(fmt.Sprintf("sample app pod never started running: %s", err.Error()))
 		return nil, err
 	}
 
