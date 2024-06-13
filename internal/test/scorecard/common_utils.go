@@ -356,7 +356,7 @@ func (r *TestResources) newSampleApp() *appsv1.Deployment {
 					Containers: []corev1.Container{
 						{
 							Name:            "quarkus-test-agent",
-							Image:           "quay.io/miwan/quarkus-test:0.4.0-snapshot",
+							Image:           "quay.io/miwan/quarkus-test:0.5.0-snapshot",
 							ImagePullPolicy: corev1.PullAlways,
 							Env: []corev1.EnvVar{
 								{
@@ -388,11 +388,11 @@ func (r *TestResources) newSampleApp() *appsv1.Deployment {
 									Value: "Bearer abcd1234",
 								},
 								{
-									Name:  "CRYOSTAT_AGENT_WEBCLIENT_SSL_TRUST_ALL",
+									Name:  "CRYOSTAT_AGENT_WEBCLIENT_TLS_TRUST_ALL",
 									Value: "true",
 								},
 								{
-									Name:  "CRYOSTAT_AGENT_WEBCLIENT_SSL_VERIFY_HOSTNAME",
+									Name:  "CRYOSTAT_AGENT_WEBCLIENT_TLS_VERIFY_HOSTNAME",
 									Value: "false",
 								},
 								{
