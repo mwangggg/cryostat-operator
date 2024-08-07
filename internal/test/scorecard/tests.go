@@ -321,8 +321,11 @@ func CryostatAgentTest(bundle *apimanifests.Bundle, namespace string, openShiftC
 		return r.fail(fmt.Sprintf("failed to reach the application: %s", err.Error()))
 	}
 
-	svc := r.newSampleService()
-	_, err = r.applyAndCreateSampleApplication(r.newSampleApp(), svc)
+	sampleAppName := "quarkus-cryostat-agent"
+
+	// Deploy sample application and service
+	svc := r.newSampleService(sampleAppName)
+	_, err = r.applyAndCreateSampleApplication(r.newSampleApp(sampleAppName), svc)
 	if err != nil {
 		return r.fail(fmt.Sprintf("application failed to be deployed: %s", err.Error()))
 	}
@@ -334,7 +337,7 @@ func CryostatAgentTest(bundle *apimanifests.Bundle, namespace string, openShiftC
 	apiClient := NewCryostatRESTClientset(base)
 
 	// Look for sample app target
-	target, err := r.getSampleAppTarget(apiClient)
+	target, err := r.getSampleAppTarget(apiClient, sampleAppName)
 	if err != nil {
 		return r.fail(fmt.Sprintf("failed to register sample app: %s", err.Error()))
 	}

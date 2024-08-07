@@ -116,11 +116,11 @@ func (r *TestResources) StartLogs(cr *operatorv1beta2.Cryostat) error {
 	}
 
 	if r.Name == "cryostat-agent" {
-		sampleAppPodName, err := r.getSampleAppPodName()
+		sampleAppPodName, err := r.getSampleAppPodName("quarkus-cryostat-agent")
 		if err != nil {
 			return fmt.Errorf("failed to get pod name for sample app: %s", err.Error())
 		}
-		logSelections[sampleAppPodName] = []string{"quarkus-test-agent"}
+		logSelections[sampleAppPodName] = []string{"quarkus-cryostat-agent"}
 		bufferSize++
 	}
 
